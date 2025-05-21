@@ -17,6 +17,26 @@ services:
       - net_admin
       - sys_module
     restart: unless-stopped
+    healthcheck:
+      test: tailscale status --peers=false --json | grep -q 'Online.*true'
+
+  minecraf-controller:
+    build:
+      context: ./beef-controller
+      dockerfile: Dockerfile
+    container_name: ${CONTAINER_NAME}_controller
+    depends_on:
+      tailscale-minecraft:
+        condition: service_healthy
+      minecraft-server:
+        condition: service_started
+    volumes:
+      - ./beef-controller/data:/var/beef_controller
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      CONTAINER_NAME: "${CONTAINER_NAME}" 
+    restart: unless-stopped
+    network_mode: service:tailscale-minecraft
 
   minecraft-server:
     image: eclipse-temurin:21
@@ -37,6 +57,9 @@ services:
     volumes:
       - ${MINECRAFT_DIR}:/minecraft # chicken jockey
       - ${BACKUPS_DIR}:/minecraft/backups # serverutilities backups
+    depends_on:
+      tailscale-minecraft:
+        condition: service_healthy
     restart: unless-stopped
     network_mode: service:tailscale-minecraft
 
@@ -50,4 +73,7 @@ services:
     volumes:
         - ${MINECRAFT_DIR}:/storage
     restart: unless-stopped
+    depends_on:
+      tailscale-minecraft:
+        condition: service_healthy
     network_mode: service:tailscale-minecraft

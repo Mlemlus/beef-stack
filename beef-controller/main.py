@@ -23,7 +23,7 @@ if "role" not in ss: # init role
     ss.role = ""
 
 if "users_file_path" not in ss: # static path for our users data file
-    ss.users_file_path = "data\\users.csv"
+    ss.users_file_path = "data/users.csv"
 
 if "pages" not in ss:
     ss.pages = {}
