@@ -116,7 +116,7 @@ def refresh_dashboard(): # get docker container, refresh elements
             st.error("Server is Offline (Container is not running).")
     
     # Logs
-    if live_container:
+    if live_container and ss.role in ["Administrator", "User"]:
         lines = st.slider("Lines of Logs to display", min_value=0, max_value=500, value=20)
         logs = live_container.logs(stdout=True, tail=lines, timestamps=False).decode("utf-8")
         st.code(logs, language="log")
