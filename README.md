@@ -1,5 +1,5 @@
 # beef-stack
-<h3 align="center">Self hosted Minecraft server with Web Managment and SMB Access</h3>
+<h3 align="center">Self hosted Minecraft server with Web Management and SMB Access</h3>
 
 ### Quick-start
 
