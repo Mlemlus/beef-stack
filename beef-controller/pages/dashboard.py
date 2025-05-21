@@ -2,6 +2,7 @@ import streamlit as st
 from streamlit import session_state as ss
 from mcstatus import JavaServer as mcjav
 import docker, time, os
+from datetime import timedelta
 
 #### Permission check ####
 if not ss.role or ss.role not in ["Administrator", "User", "Guest"]:
@@ -30,16 +31,17 @@ FORMAT_CODES = {
 MINECRAFT_CONTAINER_NAME = os.getenv("CONTAINER_NAME") 
 MINECRAFT_SERVER_HOST = "localhost"
 MINECRAFT_SERVER_PORT = 25565
-AUTO_REFRESH_INTERVAL = 15 # seconds
+AUTO_REFRESH_INTERVAL = 30 # seconds
 
 #### Session state inicializations ####
 if "last_refresh_time" not in ss:
-    ss.last_refresh_time = 0
+    ss.last_refresh_time = time.time()
 
 #### Functions ####
 def refresh_dashboard(): # get docker container, refresh elements
     container_status_str = get_container_status_string(client, MINECRAFT_CONTAINER_NAME)
     container_is_running = (container_status_str == "running")
+    live_container = None # holds the container object
     col1,col2 = st.columns(2)
 
     # Container stats
@@ -48,7 +50,6 @@ def refresh_dashboard(): # get docker container, refresh elements
         st.caption(f"Managing container: `{MINECRAFT_CONTAINER_NAME}` | Querying server: `{MINECRAFT_SERVER_HOST}:{MINECRAFT_SERVER_PORT}`")
         st.metric("Container Status", container_status_str.capitalize())
 
-        live_container = None # holds the container object
         if container_status_str not in ["Not Found", "Docker client unavailable"] and \
            not container_status_str.startswith("API Error") and \
            not container_status_str.startswith("Error fetching status"):
@@ -113,6 +114,12 @@ def refresh_dashboard(): # get docker container, refresh elements
             st.warning(f"Server appears Offline. Reason: {mc_status.get('error', 'Unknown')}")
         else:
             st.error("Server is Offline (Container is not running).")
+    
+    # Logs
+    if live_container:
+        lines = st.slider("Lines of Logs to display", min_value=0, max_value=500, value=20)
+        logs = live_container.logs(stdout=True, tail=lines, timestamps=False).decode("utf-8")
+        st.code(logs, language="log")
 
 
 @st.cache_resource # Cache the Docker client
@@ -201,27 +208,31 @@ def parse_motd(motd):
 # Initialize Docker client
 client = get_docker_client()
 #### Body ####
-
-## Main ##
-# We'll use placeholders to update sections dynamically
-status_placeholder = st.empty()
-controls_placeholder = st.empty()
-mc_stats_placeholder = st.empty()
-
 # Initial call to display everything
 refresh_dashboard()
 
-# Auto-refresh (optional, can be demanding)
-# You might want to control this with a checkbox or make the interval longer
-if time.time() - ss.last_refresh_time > AUTO_REFRESH_INTERVAL:
-    ss.last_refresh_time = time.time()
-    st.rerun()
-
 st.sidebar.markdown("---")
-if st.sidebar.button("🔄 Manual Refresh"):
-    # Clear caches for immediate re-fetch
+cols = st.sidebar.columns(2)
+if cols[0].button("🔄 Manual Refresh"):
+    # Clear caches for immediate rerun
     get_container_status_string.clear()
     get_minecraft_server_status.clear()
     st.rerun()
+if cols[1].button("🛑 Stop Refreshing"):
+    st.stop()
 
-st.sidebar.markdown(f"Auto-refreshes every {AUTO_REFRESH_INTERVAL}s.")
+# refresh logic
+refresh_time = st.sidebar.empty()
+refresh_time_interval = st.sidebar.slider("Auto-refresh interval", 
+                                          value=AUTO_REFRESH_INTERVAL,
+                                          step=30,
+                                          min_value=30,
+                                          max_value=600, 
+                                          format="%ds")
+
+for remaining in range(refresh_time_interval, 0, -5):
+    refresh_time.text(f"Refreshing in {remaining} seconds…")
+    time.sleep(5)
+get_container_status_string.clear()
+get_minecraft_server_status.clear()
+st.rerun()
